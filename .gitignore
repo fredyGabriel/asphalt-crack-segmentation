@@ -1,0 +1,49 @@
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+env/
+build/
+develop-eggs/
+dist/
+downloads/
+eggs/
+.eggs/
+lib/
+lib64/
+parts/
+sdist/
+var/
+*.egg-info/
+.installed.cfg
+*.egg
+
+# PyTorch
+*.pth
+*.pt
+*.bin
+
+# Jupyter Notebooks
+.ipynb_checkpoints
+
+# Entornos virtuales
+venv/
+ENV/
+env/
+miniconda3/
+
+# VSCode
+.vscode/
+*.code-workspace
+
+# Datos grandes (opcional, dependiendo de tu caso)
+/CrackDataset/
+
+# Resultados de experimentos (opcional)
+/results/
+
+# Logs
+logs/
+*.log

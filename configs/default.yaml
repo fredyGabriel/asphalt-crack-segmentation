@@ -1,0 +1,66 @@
+paths:
+  data_path: "C:/Users/fgrv/OneDrive/Documentos/PythonProjects/doctorado/\
+    reinicio/asphalt-crack-segmentation"
+  dataset_path: "C:/Users/fgrv/OneDrive/Documentos/PythonProjects/doctorado/\
+    CrackDataset/luz_crack/"
+  
+training:
+  save_model: true
+  batch_size: 32
+  learning_rate: 0.001
+  num_epochs: 100
+  weight_decay: 0.0001
+  num_workers: 16
+  model_save_path: "models/best_model.pth"
+  log_interval: 10
+  save_frequency: 5
+  early_stopping_patience: 10
+  accumulation_steps: 4
+  mixed_precision: true  # Enable/disable mixed precision
+  image_size: 256  # Image size output from Resize
+
+  # Add scheduler configuration
+  scheduler:
+    type: "ReduceLROnPlateau"  # Allow different schedulers
+    mode: "min"
+    factor: 0.5
+    patience: 5
+    min_lr: 0.00001  # Optional: lower limit for LR
+
+model:
+  # General model configuration
+  type: "unet_resnet"  # Options: "unet", "unet_resnet"
+  input_channels: 3
+  output_channels: 1
+  save_path: "saved_models/model4"
+
+  # UNet specific parameters
+  unet:
+    num_filters: 64
+    encoder_dropout: 0.1
+    bottleneck_dropout: 0.5
+    decoder_dropout: 0.1
+
+  loss:
+    type: "dice"  # Options: "dice", "bce", "combined"
+    bce_weight: 0.5  # Weight for BCE loss in combined loss
+    dice_weight: 0.5  # Weight for Dice loss in combined loss
+  
+  # UNetResNet specific parameters
+  unet_resnet:
+    backbone: "resnet34"  # Options: "resnet18", "resnet34", "resnet50", "resnet101", "resnet152"
+    pretrained: true
+    freeze_encoder: true
+    features: [256, 128, 64, 32]
+    decoder_dropout: 0.1
+    dropout_factor: 1.0
+    unfreezing_patience: 5  # Epochs without improvement before unfreezing next stage
+
+evaluation:
+  metrics: 
+    - iou
+    - recall
+    - precision
+    - f1
+  save_results: true
+  results_save_path: "results/evaluation_results.json"
