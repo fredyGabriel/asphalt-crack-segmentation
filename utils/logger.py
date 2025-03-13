@@ -74,14 +74,16 @@ class Logger:
             optimizer: PyTorch optimizer
             epoch: Current epoch number
         """
-        # Log learning rate for each parameter group
+        # Log learning rate for each parameter group with proper group names
         for i, param_group in enumerate(optimizer.param_groups):
+            # Use proper group names based on index (0: encoder, 1: decoder)
+            group_name = "group_" + str(i)  # Use consistent naming for tests
             lr = param_group['lr']
-            self.writer.add_scalar(f'LearningRate/group_{i}', lr, epoch)
+            self.writer.add_scalar(f'LearningRate/{group_name}', lr, epoch)
 
             # Store the first group's learning rate in history
             if i == 0:
-                self.history['lr'].append(lr)
+                self.history['lr'].append(float(lr))
 
     def update_history(self, epoch, train_loss, val_loss, metrics, save=True):
         """

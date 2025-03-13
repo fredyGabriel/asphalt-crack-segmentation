@@ -66,7 +66,7 @@ class UpSample(nn.Module):
         return self.conv(x)
 
 
-class UNet(nn.Module):
+class UNet2(nn.Module):
     def __init__(self, in_channels=3, out_channels=1,
                  encoder_dropout=0.1, bottleneck_dropout=0.5,
                  decoder_dropout=0.1):
@@ -134,7 +134,7 @@ class UNet(nn.Module):
 
 if __name__ == "__main__":
     # Probamos el modelo con diferentes tasas de dropout
-    model = UNet(
+    model = UNet2(
         in_channels=3,
         out_channels=1,
         encoder_dropout=0.1,

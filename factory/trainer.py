@@ -150,14 +150,6 @@ class Trainer:
             else:
                 self.scheduler.step()
 
-            # Register current learning rates in TensorBoard
-            if hasattr(self, 'writer') and self.writer:
-                for i, group in enumerate(self.optimizer.param_groups):
-                    group_name = "encoder" if i == 0 and len(
-                        self.optimizer.param_groups) > 1 else "decoder"
-                    self.writer.add_scalar(f'LearningRate/\
-{group_name}', group['lr'], epoch)
-
             print(f"Epoch time: {epoch_time:.2f}s")
 
         # Save final history

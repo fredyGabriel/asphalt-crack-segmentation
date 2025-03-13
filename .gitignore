@@ -47,3 +47,7 @@ miniconda3/
 # Logs
 logs/
 *.log
+
+# Ignorar carpeta de logs de pruebas
+test_logs/
+*.log
