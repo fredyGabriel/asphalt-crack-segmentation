@@ -24,6 +24,12 @@ def main():
     model_manager = ModelManager(config, device)
     model_manager.create_model()
 
+    # Accelerate training on RTX GPUs
+    model_manager.model = torch.compile(model_manager.model)
+
+    # Adjust cudnn to improve performance
+    torch.backends.cudnn.benchmark = True
+
     # Loss function - using config directly here
     loss_config = config['model'].get('loss', {})
     loss_type = loss_config.get('type', 'bce').lower()

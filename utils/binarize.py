@@ -1,5 +1,5 @@
 import os
-import numpy as np
+import torch
 from PIL import Image
 from tqdm import tqdm  # Para mostrar una barra de progreso
 
@@ -29,6 +29,9 @@ def binarizar_imagenes(carpeta_origen, carpeta_destino, umbral=0.5):
 
     contador = 0
 
+    # Definir dispositivo (CPU/GPU)
+    device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
+
     # Procesa cada imagen con una barra de progreso
     for archivo in tqdm(archivos, desc="Binarizando imágenes"):
         ruta_completa = os.path.join(carpeta_origen, archivo)
@@ -40,10 +43,15 @@ def binarizar_imagenes(carpeta_origen, carpeta_destino, umbral=0.5):
             # Convertir a escala de grises
             imagen_gris = imagen.convert('L')
 
-            # Binarizar imagen
-            imagen_array = np.array(imagen_gris)
-            imagen_bin_array = ((imagen_array / 255 > umbral) * 255
-                                ).astype(np.uint8)
+            # Binarizar imagen usando PyTorch
+            imagen_tensor = torch.tensor(list(imagen_gris.getdata()),
+                                         dtype=torch.float32,
+                                         device=device).reshape(
+                                             imagen_gris.height,
+                                             imagen_gris.width)
+            imagen_bin_tensor = ((imagen_tensor / 255.0) > umbral
+                                 ).float() * 255.0
+            imagen_bin_array = imagen_bin_tensor.cpu().byte().numpy()
             imagen_bin = Image.fromarray(imagen_bin_array)
 
             # Guardar imagen binarizada con el mismo nombre

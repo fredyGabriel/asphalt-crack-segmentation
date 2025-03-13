@@ -6,19 +6,19 @@ paths:
   
 training:
   save_model: true
-  batch_size: 32
+  batch_size: 16
   learning_rate: 0.001
-  encoder_lr_factor: 0.1  # Encoder aprenderá 10 veces más lento que el decoder
-  num_epochs: 100
+  encoder_lr_factor: 0.1
+  num_epochs: 200
   weight_decay: 0.0001
-  num_workers: 16
+  num_workers: 8
   model_save_path: "models/best_model.pth"
   log_interval: 10
   save_frequency: 5
   early_stopping_patience: 10
-  accumulation_steps: 4
+  accumulation_steps: 2
   mixed_precision: true  # Enable/disable mixed precision
-  image_size: 256  # Image size output from Resize
+  image_size: 384  # Image size output from Resize
 
   # Add scheduler configuration
   scheduler:
@@ -29,23 +29,23 @@ training:
 
 model:
   type: "swin2_unet"  # or unet, unet2, unet_resnet
-  input_channels: 3   # Standardized parameter name
-  output_channels: 1  # Standardized parameter name
+  in_channels: 3   # Standardized parameter name
+  out_channels: 1  # Standardized parameter name
 
   # Model specific configurations
   swin2_unet:  
-    img_size: 224
+    img_size: 384
     patch_size: 4
     embed_dim: 96
     depths: [2, 2, 6, 2]
     depths_decoder: [2, 2, 2, 2]
     num_heads: [3, 6, 12, 24]
-    window_size: 8
+    window_size: 12
     mlp_ratio: 4.0
     qkv_bias: true
     drop_rate: 0.0
     attn_drop_rate: 0.0
-    drop_path_rate: 0.1
+    drop_path_rate: 0.2
     ape: false
     patch_norm: true
     use_checkpoint: false

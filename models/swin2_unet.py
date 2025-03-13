@@ -3,6 +3,7 @@ import torch
 from collections import OrderedDict
 import torch.nn as nn
 from models.swin_transformer_v2 import SwinTransformerV2
+from models.aspp_module import ASPPModule
 
 
 class PatchExpand(nn.Module):
@@ -127,10 +128,10 @@ class SwinUNetV2(nn.Module):
     """
     def __init__(
         self,
-        img_size=224,
+        img_size=448,
         patch_size=4,
-        in_chans=3,
-        num_classes=1,
+        in_channels=3,
+        out_channels=1,
         embed_dim=96,
         depths=[2, 2, 6, 2],
         depths_decoder=[2, 2, 2, 2],
@@ -159,7 +160,7 @@ class SwinUNetV2(nn.Module):
         self.encoder = SwinTransformerV2Encoder(
             img_size=img_size,
             patch_size=patch_size,
-            in_chans=in_chans,
+            in_channels=in_channels,
             embed_dim=embed_dim,
             depths=depths,
             num_heads=num_heads,
@@ -191,8 +192,19 @@ class SwinUNetV2(nn.Module):
         self.patch_size = patch_size
         self.num_layers = len(depths)
         self.embed_dim = embed_dim
-        self.num_classes = num_classes
+        self.out_channels = out_channels
         self.patches_resolution = self.encoder.patches_resolution
+
+        # Initialize ASPP module
+        self.aspp = ASPPModule(
+            input_dim=int(embed_dim * 2 ** (len(depths)-1)),  # Dim bottleneck
+            output_dim=int(embed_dim * 2 ** (len(depths)-1)),
+            input_resolution=(
+                self.patches_resolution[0] // (2 ** (len(depths)-1)),
+                self.patches_resolution[1] // (2 ** (len(depths)-1))
+            ),
+            rates=[3, 6, 9]  # Ajusta según la resolución de tu bottleneck
+        )
 
         # Create decoder layers
         self.layers_up = nn.ModuleList()
@@ -244,7 +256,7 @@ class SwinUNetV2(nn.Module):
         # Final segmentation layer
         self.final_conv = nn.Conv2d(
             in_channels=embed_dim,
-            out_channels=num_classes,
+            out_channels=out_channels,
             kernel_size=1
         )
 
@@ -334,7 +346,7 @@ class SwinTransformerV2Encoder(nn.Module):
         self,
         img_size=224,
         patch_size=4,
-        in_chans=3,
+        in_channels=3,
         embed_dim=96,
         depths=[2, 2, 6, 2],
         num_heads=[3, 6, 12, 24],
@@ -358,7 +370,7 @@ class SwinTransformerV2Encoder(nn.Module):
         self.model = SwinTransformerV2(
             img_size=img_size,
             patch_size=patch_size,
-            in_chans=in_chans,
+            in_chans=in_channels,
             num_classes=0,  # No classification head
             embed_dim=embed_dim,
             depths=depths,
@@ -521,10 +533,10 @@ class SwinTransformerV2Encoder(nn.Module):
 if __name__ == "__main__":
     # Example usage with transfer learning
     model = SwinUNetV2(
-        img_size=256,
+        img_size=384,
         patch_size=4,
-        in_chans=3,
-        num_classes=1,
+        in_channels=3,
+        out_channels=1,
         embed_dim=96,
         depths=[2, 2, 6, 2],
         num_heads=[3, 6, 12, 24],
