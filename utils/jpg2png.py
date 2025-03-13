@@ -44,7 +44,7 @@ def convert_jpg_to_png(input_folder, output_folder=None,
     all_images = []
     for root, _, files in os.walk(input_folder):
         for file in files:
-            if file.lower().endswith(jpg_extensions):
+            if file.lower().endsWith(jpg_extensions):
                 all_images.append(os.path.join(root, file))
 
     # Procesar imágenes con barra de progreso
@@ -62,7 +62,7 @@ def convert_jpg_to_png(input_folder, output_folder=None,
             out_path = output_folder / f"{Path(img_path).stem}.png"
 
         try:
-            # Abrir y guardar la imagen
+            # Abrir imagen y convertirla a tensor para procesamiento
             with Image.open(img_path) as img:
                 img.save(out_path, "PNG")
             total_converted += 1

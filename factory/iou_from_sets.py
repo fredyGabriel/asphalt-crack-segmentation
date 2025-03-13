@@ -1,5 +1,6 @@
 import os
 import cv2
+import torch
 import numpy as np
 from pathlib import Path
 from tqdm import tqdm
@@ -13,24 +14,36 @@ def calculate_iou(pred_mask, gt_mask):
     ground truth.
 
     Args:
-        pred_mask (numpy.ndarray): Máscara de predicción binaria
-        gt_mask (numpy.ndarray): Máscara de ground truth binaria
+        pred_mask (numpy.ndarray or torch.Tensor): Máscara de predicción
+            binaria
+        gt_mask (numpy.ndarray or torch.Tensor): Máscara de ground truth
+            binaria
 
     Returns:
         float: Valor IoU entre 0 y 1
     """
+    # Convert to PyTorch tensors if they're numpy arrays
+    if isinstance(pred_mask, np.ndarray):
+        pred_mask = torch.from_numpy(pred_mask)
+    if isinstance(gt_mask, np.ndarray):
+        gt_mask = torch.from_numpy(gt_mask)
+
+    # Make sure tensors are on CPU
+    pred_mask = pred_mask.cpu()
+    gt_mask = gt_mask.cpu()
+
     # Binarizar las máscaras si no lo están ya (umbral a 127)
     pred_binary = pred_mask > 127
     gt_binary = gt_mask > 127
 
-    # Calcular intersección y unión
-    intersection = np.logical_and(pred_binary, gt_binary).sum()
-    union = np.logical_or(pred_binary, gt_binary).sum()
+    # Calcular intersección y unión usando PyTorch
+    intersection = torch.logical_and(pred_binary, gt_binary).sum().item()
+    union = torch.logical_or(pred_binary, gt_binary).sum().item()
 
     # Evitar división por cero
     if union == 0:
         # Si ambas máscaras están vacías, IoU = 1.0
-        if np.sum(pred_binary) == 0 and np.sum(gt_binary) == 0:
+        if pred_binary.sum().item() == 0 and gt_binary.sum().item() == 0:
             return 1.0
         return 0.0
 
@@ -81,7 +94,7 @@ directorios.")
         pred_path = pred_files[name]
         target_path = target_files[name]
 
-        # Cargar imágenes
+        # Cargar imágenes y convertir a tensores
         pred_img = cv2.imread(str(pred_path), cv2.IMREAD_GRAYSCALE)
         target_img = cv2.imread(str(target_path), cv2.IMREAD_GRAYSCALE)
 
@@ -90,26 +103,36 @@ directorios.")
             print(f"Error al cargar imágenes para {name}")
             continue
 
+        # Convertir a tensores de PyTorch
+        pred_tensor = torch.from_numpy(pred_img)
+        target_tensor = torch.from_numpy(target_img)
+
         # Redimensionar predicción al tamaño del target si son diferentes
         if pred_img.shape != target_img.shape:
+            # Resize using OpenCV and then convert to tensor
             pred_img = cv2.resize(pred_img, (target_img.shape[1],
                                              target_img.shape[0]),
                                   interpolation=cv2.INTER_NEAREST)
+            pred_tensor = torch.from_numpy(pred_img)
 
         # Normalizar polaridad: fisuras en blanco (255)
         # Este enfoque asume que las fisuras son la minoría de píxeles
-        if np.mean(pred_img) > 127:
-            pred_img = 255 - pred_img
+        if torch.mean(pred_tensor).item() > 127:
+            pred_tensor = 255 - pred_tensor
 
-        if np.mean(target_img) > 127:
-            target_img = 255 - target_img
+        if torch.mean(target_tensor).item() > 127:
+            target_tensor = 255 - target_tensor
 
-        # Calcular IoU
-        iou = calculate_iou(pred_img, target_img)
+        # Calcular IoU usando tensores
+        iou = calculate_iou(pred_tensor, target_tensor)
         results[name] = iou
 
         # Generar visualización
         if visualize and output_dir is not None:
+            # Para visualización, convertimos a NumPy arrays
+            pred_img = pred_tensor.numpy()
+            target_img = target_tensor.numpy()
+
             plt.figure(figsize=(18, 6))
 
             # Predicción
@@ -147,8 +170,12 @@ directorios.")
                         dpi=150)
             plt.close()
 
-    # Calcular promedio y guardar resultados
-    average_iou = np.mean(list(results.values()))
+    # Calcular promedio usando PyTorch
+    if results:
+        iou_values = torch.tensor(list(results.values()))
+        average_iou = torch.mean(iou_values).item()
+    else:
+        average_iou = 0.0
 
     if output_dir is not None:
         # Guardar resultados en CSV

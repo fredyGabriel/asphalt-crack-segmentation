@@ -8,8 +8,6 @@ between images and masks.
 """
 
 import torch
-import math
-import numpy as np
 from torchvision import transforms
 from PIL import Image
 import torchvision.transforms.functional as F
@@ -74,10 +72,8 @@ class ToTensor:
         """
         # Convert PIL images to tensors
         image = transforms.ToTensor()(image)
-        # For masks, ensure binary values (0 or 1)
-        mask = torch.from_numpy(np.array(mask, dtype=np.float32) / 255.0)
-        if len(mask.shape) == 2:  # Add channel dim if needed
-            mask = mask.unsqueeze(0)
+        # Convert mask to tensor without using numpy
+        mask = transforms.ToTensor()(mask)  # Values already in [0,1] range
         return image, mask
 
 
@@ -299,9 +295,7 @@ class RandomShadow:
         self.p = p
         self.min_shadows, self.max_shadows = num_shadows_range
         self.min_darkness, self.max_darkness = shadow_darkness_range
-
-        # Pre-calcular valores constantes para evitar recálculos
-        self.pi = torch.tensor(math.pi)  # Usar constante en lugar de torch.pi
+        self.pi = torch.pi
 
     def __call__(self, image, mask):
         if torch.rand(1).item() < self.p:

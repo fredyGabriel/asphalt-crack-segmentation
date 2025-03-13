@@ -1,5 +1,6 @@
 import os
 import cv2
+import torch
 import numpy as np
 from pathlib import Path
 from tqdm import tqdm
@@ -19,16 +20,27 @@ def calculate_f1_score(pred_mask, gt_mask):
     Returns:
         tuple: (f1_score, precision, recall) - valores entre 0 y 1
     """
+    # Convert to PyTorch tensors if they're numpy arrays
+    if isinstance(pred_mask, np.ndarray):
+        pred_mask = torch.from_numpy(pred_mask)
+    if isinstance(gt_mask, np.ndarray):
+        gt_mask = torch.from_numpy(gt_mask)
+
+    # Make sure tensors are on CPU and using standard dtype
+    pred_mask = pred_mask.cpu()
+    gt_mask = gt_mask.cpu()
+
     # Binarizar las máscaras si no lo están ya (umbral a 127)
     pred_binary = pred_mask > 127
     gt_binary = gt_mask > 127
 
-    # Calcular métricas básicas
-    true_positive = np.logical_and(pred_binary, gt_binary).sum()
-    false_positive = np.logical_and(pred_binary, np.logical_not(gt_binary)
-                                    ).sum()
-    false_negative = np.logical_and(np.logical_not(pred_binary), gt_binary
-                                    ).sum()
+    # Calcular métricas básicas usando PyTorch
+    true_positive = torch.logical_and(pred_binary, gt_binary).sum().item()
+    false_positive = torch.logical_and(pred_binary,
+                                       torch.logical_not(gt_binary)).sum().\
+        item()
+    false_negative = torch.logical_and(torch.logical_not(pred_binary),
+                                       gt_binary).sum().item()
 
     # Calcular precisión y recall
     precision = true_positive / (true_positive + false_positive) if (
@@ -86,7 +98,7 @@ directorios.")
         pred_path = pred_files[name]
         target_path = target_files[name]
 
-        # Cargar imágenes
+        # Cargar imágenes y convertir a tensores
         pred_img = cv2.imread(str(pred_path), cv2.IMREAD_GRAYSCALE)
         target_img = cv2.imread(str(target_path), cv2.IMREAD_GRAYSCALE)
 
@@ -95,23 +107,29 @@ directorios.")
             print(f"Error al cargar imágenes para {name}")
             continue
 
+        # Convertir a tensores de PyTorch
+        pred_tensor = torch.from_numpy(pred_img)
+        target_tensor = torch.from_numpy(target_img)
+
         # Redimensionar predicción al tamaño del target si son diferentes
         if pred_img.shape != target_img.shape:
+            # Resize using OpenCV and then convert to tensor
             pred_img = cv2.resize(pred_img,
                                   (target_img.shape[1], target_img.shape[0]),
                                   interpolation=cv2.INTER_NEAREST)
+            pred_tensor = torch.from_numpy(pred_img)
 
         # Normalizar polaridad: fisuras en blanco (255)
         # Este enfoque asume que las fisuras son la minoría de píxeles
-        if np.mean(pred_img) > 127:
-            pred_img = 255 - pred_img
+        if torch.mean(pred_tensor) > 127:
+            pred_tensor = 255 - pred_tensor
 
-        if np.mean(target_img) > 127:
-            target_img = 255 - target_img
+        if torch.mean(target_tensor) > 127:
+            target_tensor = 255 - target_tensor
 
-        # Calcular métricas
-        f1, precision, recall = calculate_f1_score(pred_img, target_img)
-        iou = calculate_iou(pred_img, target_img)
+        # Calcular métricas usando los tensores
+        f1, precision, recall = calculate_f1_score(pred_tensor, target_tensor)
+        iou = calculate_iou(pred_tensor, target_tensor)
 
         # Guardar resultados
         results[name] = {
@@ -123,6 +141,10 @@ directorios.")
 
         # Generar visualización
         if visualize and output_dir is not None:
+            # For visualization, we need to convert back to numpy arrays
+            pred_img = pred_tensor.numpy()
+            target_img = target_tensor.numpy()
+
             plt.figure(figsize=(15, 10))
 
             # Predicción
@@ -178,16 +200,19 @@ directorios.")
                         dpi=150)
             plt.close()
 
-    # Calcular promedios y guardar resultados
-    f1_scores = [r['f1_score'] for r in results.values()]
-    precisions = [r['precision'] for r in results.values()]
-    recalls = [r['recall'] for r in results.values()]
-    ious = [r['iou'] for r in results.values()]
+    # Calcular promedios usando PyTorch
+    if results:
+        f1_scores = torch.tensor([r['f1_score'] for r in results.values()])
+        precisions = torch.tensor([r['precision'] for r in results.values()])
+        recalls = torch.tensor([r['recall'] for r in results.values()])
+        ious = torch.tensor([r['iou'] for r in results.values()])
 
-    avg_f1 = np.mean(f1_scores)
-    avg_precision = np.mean(precisions)
-    avg_recall = np.mean(recalls)
-    avg_iou = np.mean(ious)
+        avg_f1 = torch.mean(f1_scores).item()
+        avg_precision = torch.mean(precisions).item()
+        avg_recall = torch.mean(recalls).item()
+        avg_iou = torch.mean(ious).item()
+    else:
+        avg_f1 = avg_precision = avg_recall = avg_iou = 0.0
 
     if output_dir is not None:
         # Guardar resultados en CSV
@@ -257,19 +282,29 @@ directorios.")
 def calculate_iou(pred_mask, gt_mask):
     """
     Calcula el Intersection over Union (IoU) entre una máscara de predicción y
-    ground truth.
+    ground truth usando operaciones de PyTorch.
     """
+    # Convert to PyTorch tensors if they're numpy arrays
+    if isinstance(pred_mask, np.ndarray):
+        pred_mask = torch.from_numpy(pred_mask)
+    if isinstance(gt_mask, np.ndarray):
+        gt_mask = torch.from_numpy(gt_mask)
+
+    # Ensure tensors are on CPU
+    pred_mask = pred_mask.cpu()
+    gt_mask = gt_mask.cpu()
+
     # Binarizar las máscaras
     pred_binary = pred_mask > 127
     gt_binary = gt_mask > 127
 
-    # Calcular intersección y unión
-    intersection = np.logical_and(pred_binary, gt_binary).sum()
-    union = np.logical_or(pred_binary, gt_binary).sum()
+    # Calcular intersección y unión usando PyTorch
+    intersection = torch.logical_and(pred_binary, gt_binary).sum().item()
+    union = torch.logical_or(pred_binary, gt_binary).sum().item()
 
     # Evitar división por cero
     if union == 0:
-        if np.sum(pred_binary) == 0 and np.sum(gt_binary) == 0:
+        if pred_binary.sum().item() == 0 and gt_binary.sum().item() == 0:
             return 1.0
         return 0.0
 

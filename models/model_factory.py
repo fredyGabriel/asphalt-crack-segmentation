@@ -17,7 +17,12 @@ def get_model(config):
     Returns:
         nn.Module: Model instance
     """
-    model_type = config["model"]["type"]
+    if "model" not in config:
+        raise ValueError("Missing 'model' section in configuration")
+
+    model_type = config["model"].get("type")
+    if not model_type:
+        raise ValueError("Model type not specified in configuration")
 
     # Standardized parameter extraction
     in_channels = config["model"].get("input_channels", 3)  # Standardized name

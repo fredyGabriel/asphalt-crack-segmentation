@@ -10,7 +10,6 @@ import torch.nn as nn
 import torch.nn.functional as F
 import torch.utils.checkpoint as checkpoint
 from timm.models.layers import DropPath, to_2tuple, trunc_normal_
-import numpy as np
 
 
 class Mlp(nn.Module):
@@ -126,7 +125,8 @@ class WindowAttention(nn.Module):
             relative_coords_table[:, :, :, 1] /= (self.window_size[1] - 1)
         relative_coords_table *= 8  # normalize to -8, 8
         relative_coords_table = torch.sign(relative_coords_table) * torch.log2(
-            torch.abs(relative_coords_table) + 1.0) / np.log2(8)
+            torch.abs(relative_coords_table) + 1.0) / torch.log2(
+                torch.tensor(8.0))
 
         self.register_buffer("relative_coords_table", relative_coords_table)
 

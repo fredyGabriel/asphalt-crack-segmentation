@@ -1,5 +1,4 @@
 import torch
-import numpy as np
 from utils.utils import load_config
 from data.data_loader import get_data_loaders
 from factory.model_manager import ModelManager
@@ -10,7 +9,8 @@ from factory.losses import BinaryCrossEntropyLoss, DiceLoss, CombinedLoss
 def main():
     # Set seeds for reproducibility
     torch.manual_seed(42)
-    np.random.seed(42)
+    # Replace numpy random seed with torch random seed
+    torch.cuda.manual_seed_all(42)  # For multi-GPU setups
 
     # Centralized configuration loading
     config = load_config('configs/default.yaml')

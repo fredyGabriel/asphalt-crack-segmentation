@@ -37,7 +37,9 @@ class ModelManager:
         Returns:
             torch.nn.Module: The created model
         """
-        self.model = get_model(self.config).to(self.device)
+        # Create model using the factory
+        self.model = get_model(self.config)
+        self.model = self.model.to(self.device)
         print(f"Created {self.model_type} model")
         return self.model
 

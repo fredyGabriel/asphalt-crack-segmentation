@@ -28,22 +28,13 @@ training:
     min_lr_encoder: 0.000001  # LR mínimo para encoder después de annealing
 
 model:
-  # General model configuration
-  type: "unet_resnet"  # Options: "unet", "unet_resnet", "swin2_unet"
-  input_channels: 3
-  output_channels: 1
-  save_path: "saved_models/model4"
+  type: "swin2_unet"  # or unet, unet2, unet_resnet
+  input_channels: 3   # Standardized parameter name
+  output_channels: 1  # Standardized parameter name
 
-  # UNet specific parameters
-  unet:
-    num_filters: 64
-    encoder_dropout: 0.1
-    bottleneck_dropout: 0.5
-    decoder_dropout: 0.1
-
-  # SwinUNetV2 specific parameters
-  swin2_unet:
-    img_size: 256
+  # Model specific configurations
+  swin2_unet:  
+    img_size: 224
     patch_size: 4
     embed_dim: 96
     depths: [2, 2, 6, 2]
@@ -65,10 +56,16 @@ model:
     decoder_dropout: 0.1
     unfreezing_patience: 5  # Epochs without improvement before unfreezing next stage
 
+  unet:
+    num_filters: 64
+    encoder_dropout: 0.1
+    bottleneck_dropout: 0.5
+    decoder_dropout: 0.1
+
   loss:
-    type: "dice"  # Options: "dice", "bce", "combined"
-    bce_weight: 0.5  # Weight for BCE loss in combined loss
-    dice_weight: 0.5  # Weight for Dice loss in combined loss
+    type: "combined"  # bce, dice, or combined
+    bce_weight: 0.5
+    dice_weight: 0.5
   
   # UNetResNet specific parameters
   unet_resnet:

@@ -1,5 +1,5 @@
 import os
-import numpy as np
+import torch
 from PIL import Image
 from tqdm import tqdm
 
@@ -25,6 +25,9 @@ def count_black_masks(masks_folder):
     black_masks = 0
     black_mask_names = []
 
+    # Define device
+    device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
+
     # Process each image with a progress bar
     for file in tqdm(files, desc="Analyzing masks"):
         full_path = os.path.join(masks_folder, file)
@@ -34,9 +37,12 @@ def count_black_masks(masks_folder):
             # Ensure grayscale
             mask = Image.open(full_path).convert('L')
 
-            # Convert to array and check if all pixels are 0
-            mask_array = np.array(mask)
-            if np.all(mask_array == 0):
+            # Convert to tensor and check if all pixels are 0
+            mask_tensor = torch.tensor(list(mask.getdata()),
+                                       dtype=torch.uint8,
+                                       device=device).reshape(mask.height,
+                                                              mask.width)
+            if torch.all(mask_tensor == 0):
                 black_masks += 1
                 black_mask_names.append(file)
 

@@ -30,12 +30,17 @@ class Trainer:
         # Store all required components
         self.model_manager = model_manager
         self.model = model_manager.model
+        self.config = config
+
+        # Extract training parameters from config
+        self.num_epochs = self.config['training'].get('num_epochs', 100)
+        self.save_interval = self.config['training'].get('save_interval', 10)
+
         self.train_loader = train_loader
         self.val_loader = val_loader
         self.criterion = criterion
         self.optimizer = optimizer
         self.scheduler = scheduler
-        self.config = config
         self.device = device
         self.model_type = model_manager.model_type
 
