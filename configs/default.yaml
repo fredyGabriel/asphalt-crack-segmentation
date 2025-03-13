@@ -8,6 +8,7 @@ training:
   save_model: true
   batch_size: 32
   learning_rate: 0.001
+  encoder_lr_factor: 0.1  # Encoder aprenderá 10 veces más lento que el decoder
   num_epochs: 100
   weight_decay: 0.0001
   num_workers: 16
@@ -21,15 +22,14 @@ training:
 
   # Add scheduler configuration
   scheduler:
-    type: "ReduceLROnPlateau"  # Allow different schedulers
-    mode: "min"
-    factor: 0.5
-    patience: 5
-    min_lr: 0.00001  # Optional: lower limit for LR
+    type: "WarmupCosineAnnealing"
+    warmup_epochs: 10  # Épocas de calentamiento
+    min_lr_decoder: 0.00001  # LR mínimo para decoder después de annealing
+    min_lr_encoder: 0.000001  # LR mínimo para encoder después de annealing
 
 model:
   # General model configuration
-  type: "unet_resnet"  # Options: "unet", "unet_resnet"
+  type: "unet_resnet"  # Options: "unet", "unet_resnet", "swin2_unet"
   input_channels: 3
   output_channels: 1
   save_path: "saved_models/model4"
@@ -40,6 +40,30 @@ model:
     encoder_dropout: 0.1
     bottleneck_dropout: 0.5
     decoder_dropout: 0.1
+
+  # SwinUNetV2 specific parameters
+  swin2_unet:
+    img_size: 256
+    patch_size: 4
+    embed_dim: 96
+    depths: [2, 2, 6, 2]
+    depths_decoder: [2, 2, 2, 2]
+    num_heads: [3, 6, 12, 24]
+    window_size: 8
+    mlp_ratio: 4.0
+    qkv_bias: true
+    drop_rate: 0.0
+    attn_drop_rate: 0.0
+    drop_path_rate: 0.1
+    ape: false
+    patch_norm: true
+    use_checkpoint: false
+    pretrained_window_sizes: [0, 0, 0, 0]
+    pretrained: true
+    pretrained_model_path: "saved_models/swinv2_small_window16_256_in1k.pth"
+    freeze_encoder: true
+    decoder_dropout: 0.1
+    unfreezing_patience: 5  # Epochs without improvement before unfreezing next stage
 
   loss:
     type: "dice"  # Options: "dice", "bce", "combined"

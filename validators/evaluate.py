@@ -1,21 +1,32 @@
 import torch
 from factory.metrics import iou, precision, recall, f1_score
-import yaml
 from tqdm import tqdm
 
 
-def load_config(config_path):
-    with open(config_path, 'r') as file:
-        config = yaml.safe_load(file)
-    return config
+def validate(model, dataloader, criterion, device, metric_fns=None,
+             threshold=0.5, show_progress=True):
+    """
+    Validation function that calculates loss and specified metrics in a single
+    pass.
 
+    Args:
+        model: Model to evaluate
+        dataloader: Validation dataloader
+        criterion: Loss function
+        device: Device to run on
+        metric_fns: List of metric functions to calculate
+        threshold: Threshold for binary predictions
+        show_progress: Whether to show progress bar
 
-def validate(model, dataloader, criterion, device, show_progress=True):
-    """Validation function"""
+    Returns:
+        (val_loss, metrics_dict)
+    """
     model.eval()
     running_loss = 0.0
 
-    # Create progress bar
+    all_predictions = []
+    all_masks = []
+
     if show_progress:
         progress_bar = tqdm(total=len(dataloader), desc="Validating",
                             leave=False, position=0)
@@ -27,6 +38,11 @@ def validate(model, dataloader, criterion, device, show_progress=True):
             loss = criterion(outputs, masks)
             running_loss += loss.item()
 
+            probs = torch.sigmoid(outputs)
+            preds = (probs > threshold).float()
+            all_predictions.append(preds.cpu())
+            all_masks.append(masks.cpu())
+
             if show_progress:
                 progress_bar.update(1)
                 progress_bar.set_postfix(loss=f"{loss.item():.4f}")
@@ -34,66 +50,62 @@ def validate(model, dataloader, criterion, device, show_progress=True):
     if show_progress:
         progress_bar.close()
 
-    return running_loss / len(dataloader)
+    val_loss = running_loss / len(dataloader)
+
+    metrics = {}
+
+    if metric_fns:
+        all_predictions = torch.cat(all_predictions).to(device)
+        all_masks = torch.cat(all_masks).to(device)
+
+        for metric_name, metric_fn in metric_fns.items():
+            metrics[metric_name] = metric_fn(all_predictions, all_masks).item()
+
+    return val_loss, metrics
 
 
-def calculate_metrics(model, dataloader, device, config, threshold=0.3,
+def calculate_metrics(model, dataloader, device, config, threshold=0.5,
                       show_progress=True):
-    model.eval()
+    """
+    Calculates specified metrics using the validate function.
 
-    # Lists to store all predictions and targets
-    all_predictions = []
-    all_masks = []
+    Args:
+        model: Model to evaluate
+        dataloader: Validation dataloader
+        device: Device to run on
+        config: Configuration dictionary
+        threshold: Threshold for binary predictions
+        show_progress: Whether to show progress bar
 
-    if show_progress:
-        progress_bar = tqdm(total=len(dataloader),
-                            desc="Collecting data for metrics", leave=False,
-                            position=0)
-
-    with torch.no_grad():
-        for images, masks in dataloader:
-            images, masks = images.to(device), masks.to(device)
-            outputs = model(images)
-            probs = torch.sigmoid(outputs)
-            predictions = (probs > threshold).float()
-
-            # Store predictions and masks
-            all_predictions.append(predictions.cpu())
-            all_masks.append(masks.cpu())
-
-            if show_progress:
-                progress_bar.update(1)
-
-    if show_progress:
-        progress_bar.close()
-
-    # Concatenate all predictions and masks
-    all_predictions = torch.cat(all_predictions).to(device)
-    all_masks = torch.cat(all_masks).to(device)
-
+    Returns:
+        dict: Dictionary of calculated metrics
+    """
     # Get list of metrics from configuration
-    configured_metrics = config.get('evaluation', {}).get('metrics', [])
-    configured_metrics = [metric.lower() for metric in configured_metrics]
+    configured_metrics = ['iou', 'precision', 'recall', 'f1']
+    if config:
+        configured_metrics = config.get(
+            'evaluation', {}).get('metrics', configured_metrics)
+        configured_metrics = [metric.lower() for metric in
+                              configured_metrics]
 
-    # Ensure iou is always included
-    if 'iou' not in configured_metrics:
-        configured_metrics.append('iou')
-
-    # Mapping metric names to functions - standardized to lowercase
-    metric_functions = {
+    # Mapping metric names to functions
+    metric_fns = {
         'iou': iou,
         'precision': precision,
         'recall': recall,
         'f1': f1_score
     }
 
-    # Initialize dictionary with only configured metrics
-    metrics = {}
-    for metric_name in configured_metrics:
-        if metric_name in metric_functions:
-            metrics[metric_name] = metric_functions[metric_name](
-                all_predictions, all_masks).item()
+    # Filter metric functions based on configuration
+    selected_metric_fns = {
+        metric_name: metric_fns[metric_name]
+        for metric_name in configured_metrics if metric_name in metric_fns
+    }
 
+    val_loss, metrics = validate(model, dataloader, None, device,
+                                 metric_fns=selected_metric_fns,
+                                 threshold=threshold,
+                                 show_progress=show_progress)
     return metrics
 
 
