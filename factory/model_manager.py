@@ -9,19 +9,21 @@ class ModelManager:
     Manages model creation, checkpoint operations, and gradual unfreezing
     for training deep learning models.
     """
-    def __init__(self, config, device):
+    def __init__(self, config, device, logger=None):
         """
         Initialize the model manager.
 
         Args:
             config (dict): Configuration dictionary
             device (torch.device): Device to run the model on
+            logger (Logger, optional): Logger for output messages
         """
         self.config = config
         self.device = device
         self.model = None
         self.model_type = config['model'].get('type', 'unet').lower()
         self.save_path = config['model']['save_path']
+        self.logger = logger
 
         # Create directory for model checkpoints
         os.makedirs(self.save_path, exist_ok=True)
@@ -29,6 +31,14 @@ class ModelManager:
         # Tracking best model performance
         self.best_val_loss = float('inf')
         self.best_iou = 0.0
+
+    def log(self, message):
+        """Helper method to log messages using logger if available, or print \
+otherwise"""
+        if self.logger:
+            self.logger.log_info(message)
+        else:
+            print(message)
 
     def create_model(self):
         """
@@ -38,9 +48,20 @@ class ModelManager:
             torch.nn.Module: The created model
         """
         # Create model using the factory
-        self.model = get_model(self.config)
+        # Add debug information for ASPP rates if using Swin UNet
+        if self.model_type == 'swin2_unet' and 'swin2_unet' in\
+                self.config['model']:
+            swin_config = self.config['model']['swin2_unet']
+            if 'aspp_rates' in swin_config:
+                self.log(f"ASPP rates from config: {swin_config['aspp_rates']}"
+                         )
+            else:
+                self.log("Warning: No ASPP rates found in config, will use \
+defaults")
+
+        self.model = get_model(self.config, logger=self.logger)
         self.model = self.model.to(self.device)
-        print(f"Created {self.model_type} model")
+        self.log(f"Model transferred to {self.device}")
         return self.model
 
     def setup_optimizer(self, base_lr, weight_decay=1e-4):
@@ -72,8 +93,6 @@ optimizer")
         else:
             # For other models without clear separation, use all parameters as
             # decoder
-            # But create a dummy encoder parameter group to satisfy tests
-            # This ensures we always have 2 parameter groups
             encoder_params = []
             decoder_params = list(self.model.parameters())
 
@@ -83,7 +102,7 @@ optimizer")
         encoder_lr = base_lr * encoder_lr_factor
         decoder_lr = base_lr
 
-        print(f"Learning rates: encoder={encoder_lr}, decoder={decoder_lr}")
+        self.log(f"Learning rates: encoder={encoder_lr}, decoder={decoder_lr}")
 
         # Set up parameter groups for optimizer
         param_groups = []
@@ -95,8 +114,8 @@ optimizer")
             'weight_decay': weight_decay
         }
         param_groups.append(encoder_group)
-        print(f"Added encoder parameter group with "
-              f"{len(encoder_group['params'])} parameters")
+        self.log(f"Added encoder parameter group with \
+{len(encoder_group['params'])} parameters")
 
         # Always add decoder group
         decoder_group = {
@@ -105,8 +124,8 @@ optimizer")
             'weight_decay': weight_decay
         }
         param_groups.append(decoder_group)
-        print(f"Added decoder parameter group with "
-              f"{len(decoder_group['params'])} parameters")
+        self.log(f"Added decoder parameter group with \
+{len(decoder_group['params'])} parameters")
 
         # Create optimizer with parameter groups
         optimizer = torch.optim.Adam(param_groups)
@@ -133,8 +152,8 @@ optimizer")
                 patience=scheduler_config.get('patience', 5),
                 min_lr=scheduler_config.get('min_lr', 0.00001)
             )
-            print(f"Created ReduceLROnPlateau scheduler with patience=\
-{scheduler_config.get('patience', 5)}")
+            self.log(f"Created ReduceLROnPlateau scheduler with patience="
+                     f"{scheduler_config.get('patience', 5)}")
         elif scheduler_type == 'CosineAnnealingWarmRestarts':
             scheduler = torch.optim.lr_scheduler.CosineAnnealingWarmRestarts(
                 optimizer,
@@ -142,8 +161,8 @@ optimizer")
                 T_mult=scheduler_config.get('T_mult', 1),
                 eta_min=scheduler_config.get('min_lr', 0.00001)
             )
-            print(f"Created CosineAnnealingWarmRestarts scheduler with T_0=\
-{scheduler_config.get('T_0', 10)}")
+            self.log(f"Created CosineAnnealingWarmRestarts scheduler with T_0="
+                     f"{scheduler_config.get('T_0', 10)}")
         elif scheduler_type == 'WarmupCosineAnnealing':
             # Get configuration parameters with appropriate defaults
             warmup_epochs = scheduler_config.get('warmup_epochs', 5)
@@ -158,13 +177,13 @@ optimizer")
                 eta_min_decoder=min_lr_decoder,
                 eta_min_encoder=min_lr_encoder
             )
-            print(f"Created WarmupCosineAnnealing scheduler: warmup=\
+            self.log(f"Created WarmupCosineAnnealing scheduler: warmup=\
 {warmup_epochs}, "
-                  f"total={total_epochs}, min_lr_decoder={min_lr_decoder}, "
-                  f"min_lr_encoder={min_lr_encoder}")
+                     f"total={total_epochs}, min_lr_decoder={min_lr_decoder}, "
+                     f"min_lr_encoder={min_lr_encoder}")
         else:
-            print(f"Warning: Unknown scheduler type '{scheduler_type}', using \
-constant learning rate")
+            self.log(f"Warning: Unknown scheduler type '{scheduler_type}', \
+using constant learning rate")
             scheduler = torch.optim.lr_scheduler.LambdaLR(optimizer,
                                                           lambda epoch: 1.0)
 
@@ -214,7 +233,7 @@ constant learning rate")
 
         # Load model weights
         self.model.load_state_dict(checkpoint['model_state_dict'])
-        print(f"Loaded checkpoint: {path}")
+        self.log(f"Loaded checkpoint: {path}")
 
         return checkpoint
 
@@ -237,7 +256,7 @@ constant learning rate")
                 val_loss=val_loss,
                 metrics=metrics
             )
-            print(f"Saved regular checkpoint at epoch {epoch+1}")
+            self.log(f"Saved regular checkpoint at epoch {epoch+1}")
 
     def save_best_model_by_loss(self, epoch, val_loss):
         """Saves the best model based on validation loss."""
@@ -250,7 +269,7 @@ constant learning rate")
                 epoch=epoch + 1,
                 val_loss=val_loss
             )
-            print(f"Saved new best model by loss (epoch {epoch+1})")
+            self.log(f"Saved new best model by loss (epoch {epoch+1})")
             return True
         return False
 
@@ -268,7 +287,7 @@ constant learning rate")
                 val_loss=val_loss,
                 metrics=metrics
             )
-            print(f"Saved new best model by IoU (epoch {epoch+1}, IoU: \
+            self.log(f"Saved new best model by IoU (epoch {epoch+1}, IoU: \
 {metrics['iou']:.4f})")
             return True
         return False
@@ -281,7 +300,7 @@ constant learning rate")
                 final_path,
                 epoch=epoch + 1
             )
-            print("Saved final model")
+            self.log("Saved final model")
 
     def save_progress(self, epoch, train_loss, val_loss, metrics, optimizer,
                       scheduler=None):
@@ -358,7 +377,7 @@ constant learning rate")
             )
 
             if did_unfreeze:
-                print(f"Unfroze next stage of encoder (stage \
+                self.log(f"Unfroze next stage of encoder (stage \
 {self.model.current_unfreeze_stage})")
                 return True
 
@@ -366,7 +385,7 @@ constant learning rate")
 
 
 # For backward compatibility
-def create_model(config, device):
+def create_model(config, device, logger=None):
     """Legacy function for creating models, delegates to ModelManager."""
-    manager = ModelManager(config, device)
+    manager = ModelManager(config, device, logger)
     return manager.create_model()

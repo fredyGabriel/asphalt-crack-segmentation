@@ -42,6 +42,30 @@ class Logger:
 
         print(f"Logger initialized. Logs will be saved to {log_dir}")
 
+    def log_info(self, message):
+        """
+        Log general information message to console and TensorBoard.
+
+        Args:
+            message: String message to log
+        """
+        # Print to console
+        print(message)
+
+        # Log to TensorBoard as text
+        # We use add_text with a global_step of 0 to ensure it appears at the
+        # top
+        self.writer.add_text('Info', message, 0)
+
+        # Optional: Add timestamp to message
+        timestamp = time.strftime('%Y-%m-%d %H:%M:%S')
+        full_message = f"[{timestamp}] {message}"
+
+        # If you want to keep a separate text log file
+        log_file = os.path.join(self.log_dir, 'training_log.txt')
+        with open(log_file, 'a', encoding='utf-8') as f:
+            f.write(full_message + '\n')
+
     def log_metrics(self, metrics, epoch, prefix='Metrics'):
         """
         Log metrics to TensorBoard.

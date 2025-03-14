@@ -151,6 +151,7 @@ class SwinUNetV2(nn.Module):
         pretrained_model_path=None,
         freeze_encoder=True,
         decoder_dropout=0.0,
+        aspp_rates=[3, 6, 9],  # Add aspp_rates parameter with default
         **kwargs
     ):
         super().__init__()
@@ -195,7 +196,7 @@ class SwinUNetV2(nn.Module):
         self.out_channels = out_channels
         self.patches_resolution = self.encoder.patches_resolution
 
-        # Initialize ASPP module
+        # Initialize ASPP module with rates from config
         self.aspp = ASPPModule(
             input_dim=int(embed_dim * 2 ** (len(depths)-1)),  # Dim bottleneck
             output_dim=int(embed_dim * 2 ** (len(depths)-1)),
@@ -203,7 +204,7 @@ class SwinUNetV2(nn.Module):
                 self.patches_resolution[0] // (2 ** (len(depths)-1)),
                 self.patches_resolution[1] // (2 ** (len(depths)-1))
             ),
-            rates=[3, 6, 9]  # Ajusta según la resolución de tu bottleneck
+            rates=aspp_rates  # Use the parameter value
         )
 
         # Create decoder layers
@@ -271,8 +272,10 @@ class SwinUNetV2(nn.Module):
         # Encode
         bottleneck, encoder_features = self.forward_encoder(x)
 
+        # Apply ASPP to bottleneck
+        x = self.aspp(bottleneck)
+
         # Decode with skip connections
-        x = bottleneck
         for i, layer_up in enumerate(self.layers_up):
             if i == 0:
                 x = layer_up(x)
@@ -288,9 +291,8 @@ class SwinUNetV2(nn.Module):
         B, H, W, C = x.shape
         x = x.permute(0, 3, 1, 2)  # B C H W
 
-        # Final convolution and activation
+        # Final convolution WITHOUT activation
         x = self.final_conv(x)
-        x = self.sigmoid(x)
 
         return x
 
@@ -544,7 +546,8 @@ if __name__ == "__main__":
         pretrained_model_path="saved_models/swinv2_small_window16_256_in1k.\
 pth",
         freeze_encoder=True,
-        decoder_dropout=0.1
+        decoder_dropout=0.1,
+        aspp_rates=[6, 12, 18]  # Example of custom ASPP rates
     )
 
     # Show model structure and state

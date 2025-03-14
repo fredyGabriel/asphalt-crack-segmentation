@@ -8,7 +8,7 @@ class ASPPModule(nn.Module):
     Adapted to work with transformer-based sequence representations.
     """
     def __init__(self, input_dim, output_dim, input_resolution,
-                 rates=[2, 4, 6]):
+                 rates=[3, 6, 9]):
         super(ASPPModule, self).__init__()
         self.input_resolution = input_resolution
 

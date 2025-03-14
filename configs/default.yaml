@@ -5,8 +5,9 @@ paths:
     CrackDataset/luz_crack/"
   
 training:
+  seed: 49  # Random seed for reproducibility
   save_model: true
-  batch_size: 16
+  batch_size: 8
   learning_rate: 0.001
   encoder_lr_factor: 0.1
   num_epochs: 200
@@ -16,9 +17,9 @@ training:
   log_interval: 10
   save_frequency: 5
   early_stopping_patience: 10
-  accumulation_steps: 2
+  accumulation_steps: 4
   mixed_precision: true  # Enable/disable mixed precision
-  image_size: 384  # Image size output from Resize
+  image_size: 512  # Image size output from Resize
 
   # Add scheduler configuration
   scheduler:
@@ -34,13 +35,13 @@ model:
 
   # Model specific configurations
   swin2_unet:  
-    img_size: 384
+    img_size: 512  # 384, 448, 512
     patch_size: 4
     embed_dim: 96
     depths: [2, 2, 6, 2]
     depths_decoder: [2, 2, 2, 2]
     num_heads: [3, 6, 12, 24]
-    window_size: 12
+    window_size: 16
     mlp_ratio: 4.0
     qkv_bias: true
     drop_rate: 0.0
@@ -48,13 +49,14 @@ model:
     drop_path_rate: 0.2
     ape: false
     patch_norm: true
-    use_checkpoint: false
+    use_checkpoint: true
     pretrained_window_sizes: [0, 0, 0, 0]
     pretrained: true
     pretrained_model_path: "saved_models/swinv2_small_window16_256_in1k.pth"
     freeze_encoder: true
     decoder_dropout: 0.1
     unfreezing_patience: 5  # Epochs without improvement before unfreezing next stage
+    aspp_rates: [3, 6, 9]  # Dilation rates for ASPP module
 
   unet:
     num_filters: 64
